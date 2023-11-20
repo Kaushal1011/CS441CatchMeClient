@@ -7,6 +7,7 @@ import scala.io.Source
 import scala.jdk.CollectionConverters._
 import helpers.requestHelpers.get
 import io.circe.generic.auto._
+import scala.util.Using
 
 case class ComparableNode(
                            id: Int = -1,
@@ -16,10 +17,17 @@ case class ComparableNode(
                          )
 
 
+case class ConfidenceScore(
+                            id: Int = -1,
+                            score: Double = 0.0
+                          )
+
 case class AgentData(
                       name:String,
                       currentLocation:ComparableNode,
-                      adjacentNodes:List[ComparableNode]
+                      adjacentNodes:List[ComparableNode],
+                      confidenceScores: List[ConfidenceScore] = List.empty,
+                      valuableDataDistance: Int = -1
                     )
 
 case class GameState(policeLoc: Int, thiefLoc: Int, winner: String)
@@ -41,7 +49,7 @@ object Utilities {
     def bfs(frontier: List[(ComparableNode, Int)], visited: Set[Int]): Option[Int] = frontier match {
       case (node, dist) :: rest if node.id == endId => Some(dist)
       case (node, dist) :: rest if !visited.contains(node.id) =>
-        val neighbors = graph.successors(node).iterator().asScala
+        val neighbors = graph.adjacentNodes(node).iterator().asScala
           .filterNot(n => visited.contains(n.id))
           .toList.map(n => (n, dist + 1))
         bfs(rest ++ neighbors, visited + node.id)
@@ -67,7 +75,7 @@ object Utilities {
     def bfs(frontier: List[(ComparableNode, Int)], visited: Set[Int]): Option[Int] = frontier match {
       case (node, dist) :: rest if node.valuableFlag => Some(dist)
       case (node, dist) :: rest if !visited.contains(node.id) =>
-        val neighbors = graph.successors(node).iterator().asScala
+        val neighbors = graph.adjacentNodes(node).iterator().asScala
           .filterNot(n => visited.contains(n.id))
           .toList.map(n => (n, dist + 1))
         bfs(rest ++ neighbors, visited + node.id)
@@ -82,27 +90,30 @@ object Utilities {
   }
 
   def loadGraph(graphPath: String): MutableGraph[ComparableNode] = {
+    val graph = GraphBuilder.undirected().build[ComparableNode]()
+    val nodeMap = scala.collection.mutable.Map[Int, ComparableNode]()
 
-    println("Loading graph from: " + graphPath)
+    def getNode(id: Int, props: List[Int], childrenPropsHash: List[Int], valuable: Boolean): ComparableNode = {
+      nodeMap.getOrElseUpdate(id, ComparableNode(id, props, childrenPropsHash, valuable))
+    }
 
-    val graph = GraphBuilder.directed().build[ComparableNode]()
-
-    val source: Source = if (graphPath.startsWith("http://") || graphPath.startsWith("https://")) {
+    Using(if (graphPath.startsWith("http://") || graphPath.startsWith("https://")) {
       Source.fromURL(graphPath)
     } else {
       Source.fromFile(graphPath)
+    }) { source =>
+      source.getLines().foreach { line =>
+        val edge = NodeDataParser.parseEdgeData(line)
+        val srcNode = getNode(edge.srcId, edge.propertiesSrc, edge.children_prop_hash_destination, edge.valuableSrc)
+        val dstNode = getNode(edge.dstId, edge.propertiesDst, edge.children_prop_hash_destination, edge.valuableDst)
+        graph.putEdge(srcNode, dstNode)
+      }
+    } match {
+      case scala.util.Success(_) => graph
+      case scala.util.Failure(ex) =>
+        println(s"Failed to load graph: ${ex.getMessage}")
+        GraphBuilder.undirected().build[ComparableNode]() // Return an empty graph or handle the error as appropriate
     }
-
-    // Load edges
-    source.getLines().foreach { line =>
-      val edge = NodeDataParser.parseEdgeData(line)
-      val srcNode = ComparableNode(edge.srcId, edge.propertiesSrc, edge.children_prop_hash_destination, edge.valuableSrc)
-      val dstNode = ComparableNode(edge.dstId, edge.propertiesDst, edge.children_prop_hash_destination, edge.valuableDst)
-      // this method silently creates nodes if they don't exist
-      graph.putEdge(srcNode, dstNode)
-    }
-
-    graph
   }
 
   case class queryGraphRequest(val queryGraphPath: String)
