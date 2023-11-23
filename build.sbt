@@ -13,7 +13,10 @@ lazy val root = (project in file("."))
       "com.softwaremill.sttp.client3" %% "circe" % "3.9.1",
       "io.circe" %% "circe-generic" % "0.14.5",
       "io.circe" %% "circe-parser" % "0.14.5",
-
+      "ch.qos.logback" % "logback-classic" % "1.4.7",
+      "org.slf4j" % "slf4j-api" % "2.0.5",
+      "com.typesafe" % "config" % "1.4.2",
+      "org.scalatest" %% "scalatest" % "3.2.15" % "test",
     )
   )
 

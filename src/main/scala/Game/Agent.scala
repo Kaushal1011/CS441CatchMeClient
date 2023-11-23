@@ -5,6 +5,7 @@ import Game.Strategies.BaseStrategy
 import helpers.requestHelpers.post
 import io.circe.generic.auto._
 
+// agent class inspired by design of AI Agents / Agents in common gym environments
 class Agent(val name: String, val strategy: BaseStrategy) {
   def agentState:AgentData = {
     strategy.getAgentState(name)

@@ -5,9 +5,13 @@ import io.circe.generic.auto._
 import Utilities.{findDistanceToNode, findDistanceToValuableData}
 import scala.jdk.CollectionConverters._
 
+// this object defined the most basic strategies for the agents
+// contains the base strategy class and a simple strategy that picks a random node from the neighbours
+// the chase enemy node strategy picks the node with the lowest distance to the other agent
+// the chase valuable data strategy picks the node with the lowest distance to the valuable data
 object Strategies {
 
-
+  // base strategy class that defines the basic functions for the strategies
   class BaseStrategy (val agentName: String, val apiUrl: String) {
 
     def getAgentState(agentNameParam: String): AgentData = {
@@ -41,7 +45,7 @@ object Strategies {
   // chase the other agent by picking the node with thh lowest distance to the other agent
   class ChaseEnemyNodeStrategy(override val agentName: String, override val apiUrl: String, val queryGraph: MutableGraph[ComparableNode]) extends BaseStrategy(agentName, apiUrl){
 
-    private def getChaseState: AgentData = {
+    protected def getChaseState: AgentData = {
 
       val chaseAgentName = if (agentName == "police") "thief" else "police"
       getAgentState(chaseAgentName)
@@ -98,7 +102,6 @@ object Strategies {
     }
 
   }
-
 
 
 }

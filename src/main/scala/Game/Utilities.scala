@@ -8,6 +8,12 @@ import scala.jdk.CollectionConverters._
 import helpers.requestHelpers.get
 import io.circe.generic.auto._
 import scala.util.Using
+import sttp.client3._
+import io.circe.{Encoder, Decoder}
+import io.circe.generic.auto._
+import io.circe.syntax._
+
+// all the case classes used in the game
 
 case class ComparableNode(
                            id: Int = -1,
@@ -37,8 +43,12 @@ case class AgentDataRequest(agentName: String)
 case class ActionRequest(agentName: String, moveToId: Int)
 
 
+// utilities for strategies
 object Utilities {
 
+  // find distance to a node by id
+  // returns the distance if the node is found, otherwise returns -1
+  // uses BFS to find the distance
   def findDistanceToNode(graph: MutableGraph[ComparableNode], startId: Int, endId: Int): Option[Int] = {
     // A helper method to find a node by id
     def findNode(graph: MutableGraph[ComparableNode], nodeId: Int): Option[ComparableNode] =
@@ -65,6 +75,9 @@ object Utilities {
   }
 
 
+  // find distance to the valuable data
+  // returns the distance if the node is found, otherwise returns -1
+  // uses BFS to find the distance
   def findDistanceToValuableData(graph: MutableGraph[ComparableNode], startId: Int): Option[Int] = {
     // A helper method to find a node by id
     def findNode(graph: MutableGraph[ComparableNode], nodeId: Int): Option[ComparableNode] =
@@ -89,6 +102,7 @@ object Utilities {
     } yield bfs(List((startNode, 0)), Set.empty[Int]).getOrElse(-1)
   }
 
+  // graph loading utilities
   def loadGraph(graphPath: String): MutableGraph[ComparableNode] = {
     val graph = GraphBuilder.undirected().build[ComparableNode]()
     val nodeMap = scala.collection.mutable.Map[Int, ComparableNode]()
@@ -117,15 +131,32 @@ object Utilities {
   }
 
   case class queryGraphRequest(val queryGraphPath: String)
+
+  // request the query graph from the server
+  // load the graph from the path
   def requestAndLoadGraph(apiUrl:String): MutableGraph[ComparableNode] = {
     val graphPath:String = get[queryGraphRequest](apiUrl + "/querygraph").getOrElse(queryGraphRequest("Error")).queryGraphPath
     println("Loading graph from: " + graphPath)
     loadGraph(graphPath)
   }
 
+  case class InitPayload(regionalGraphPath: String, queryGraphPath: String)
+
+  // initialize the game
+  def initializeGame(apiUrl: String, regionalGraphPath: String, queryGraphPath: String, authToken: String): Unit = {
+    val backend = HttpURLConnectionBackend()
+    val payload = InitPayload(regionalGraphPath, queryGraphPath)
+    val response = basicRequest
+      .post(uri"$apiUrl/init")
+      .contentType("application/json")
+      .header("Authorization", s"Bearer $authToken")
+      .body(payload.asJson.noSpaces)
+      .send(backend)
+
+    response.body match {
+      case Right(body) => println("Response: " + body)
+      case Left(error) => println("Error: " + error)
+    }
+  }
+
 }
-// Example usage:
-// val graph: MutableGraph[ComparableNode] = GraphBuilder.undirected().build[ComparableNode]()
-// Add nodes and edges to the graph
-// val distanceOpt = findDistance(graph, startId = 1, endId = 5)
-// distanceOpt.foreach(distance => println(s"The distance is: $distance"))
